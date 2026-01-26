@@ -138,4 +138,4 @@ action:
           target: !input night_alarm_target
     - action: script.turn_on
       target:
-        entity_id: !input push_script
+        entity_id: !input push_script        
