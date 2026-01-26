@@ -1,0 +1,196 @@
+blueprint:
+  name: "Smart Shading: AUS"
+  description: >
+    **Version: 1.1.0**
+    
+    Fährt Rollladen hoch, wenn Azimuth überschritten ODER Elevation unterschritten wird.
+  domain: automation
+  source_url: https://raw.githubusercontent.com/Cavekeeper/Home-Assistant-Blueprints/main/HomeAssistant/Blueprints/smart_rollershutter_shading_off.yaml
+  input:
+    target_covers:
+      name: Rollladen
+      selector:
+        entity:
+          domain:
+            - cover
+          multiple: true
+          reorder: false
+    max_position_to_drive_off:
+      name: Maximalposition zum Hochfahren
+      description: >
+        Nur Rollläden, die weiter geschlossen sind als dieser Wert (also eine kleinere Position haben), 
+        werden von der Automatik hochgefahren.
+      default: 50
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1.0
+          unit_of_measurement: "%"
+          mode: slider
+    start_azimuth_elevation_setting:
+      name: Azimuth und Elevation Einstellung
+      icon: mdi:sun-compass
+      collapsed: true
+      input:
+        sun_azimuth_trigger:
+          name: Azimuth Ende
+          description: >
+            Hochfahren, wenn dieser Winkel überschritten wird (z.B. 150).
+          default: 60.0
+          selector:
+            number:
+              min: 0.0
+              max: 360.0
+              step: 1.0
+              unit_of_measurement: "°"
+              mode: slider
+        sun_elevation_trigger:
+          name: Elevation Ende
+          description: >
+            Hochfahren, wenn die Sonne tiefer als dieser Wert sinkt (z.B. 10).
+          default: -1.0
+          selector:
+            number:
+              min: -10.0
+              max: 90.0
+              step: 1.0
+              unit_of_measurement: "°"
+              mode: slider
+    start_generell_setting:
+      name: Allgemeine Einstellungen
+      icon: mdi:cog
+      collapsed: true
+      input:
+        main_switch:
+          name: Hauptschalter
+          description: >
+            Schalter auswählen, der die Automation Ein- und Ausschaltet.
+          default: []
+          selector:
+            entity:
+              domain:
+                - input_boolean
+              reorder: false
+              multiple: false
+    start_notify_option:
+      name: Nachricht senden
+      icon: mdi:devices
+      collapsed: true
+      input:
+        include_notify:
+          name: Benachrichtigung aktivieren
+          description: >
+            Soll eine Benachrichtigung gesendet werden?
+          default: disable_mobile_app_notify
+          selector:
+            select:
+              options:
+                - label: Aktiviere Mobile App Benachrichtigung
+                  value: "enable_mobile_app_notify"
+                - label: Deaktiviere Mobile App Benachrichtigung
+                  value: "disable_mobile_app_notify"
+        notify_device:
+          name: Benachrichtigungs-Dienst
+          description: >
+            Wähle hier dein Handy aus.
+          default: []
+          selector:
+            device:
+              filter:
+                - integration: mobile_app
+              multiple: true
+        notify_title:
+          name: Title
+          description: >
+            Schreibe den Titel deiner Benachrichtigung
+          default: 📢 Beschattung deaktiviert
+          selector: 
+            text:
+
+variables:
+  include_notify: !input include_notify
+  filtered_devices: !input notify_device
+  notify_title: !input notify_title
+  target_covers_var: !input target_covers
+  max_pos: !input max_position_to_drive_off
+  moving_covers_names: >-
+    {% set covers = expand(target_covers_var) %}
+    {{ covers | map(attribute='name') | join(', ') }}
+  trigger_entity: "{{ trigger.entity_id }}"
+  trigger_name: "{{ state_attr(trigger.entity_id, 'friendly_name') or trigger.entity_id }}"
+  trigger_value: "{{ trigger.to_state.state }}"
+  trigger_time: "{{ now().strftime('%H:%M:%S') }}"
+  trigger_label: >
+    {% if trigger.entity_id == 'sensor.sun_azimuth' %}
+      Sonnenazimut
+    {% elif trigger.entity_id == 'sensor.sun_elevation' %}
+      Sonnenhöhe
+    {% else %}
+      {{ trigger.entity_id }}
+    {% endif %}
+
+trigger:
+  - platform: state
+    entity_id: sensor.sun_azimuth
+  - platform: state
+    entity_id: sensor.sun_elevation
+
+condition:
+  - condition: state
+    entity_id: !input main_switch
+    state: "on"
+  - condition: or
+    conditions:
+      - condition: numeric_state
+        entity_id: sensor.sun_azimuth
+        above: !input sun_azimuth_trigger
+      - condition: numeric_state
+        entity_id: sensor.sun_elevation
+        below: !input sun_elevation_trigger
+  - alias: "Sicherstellen, dass kein Rollladen gerade fährt"
+    condition: template
+    value_template: >
+      {% set covers = expand(target_covers_var) %}
+      {% set moving_covers = covers | selectattr('state', 'in', ['opening', 'closing']) | list %}
+      {{ moving_covers | length == 0 }}
+  - alias: "Prüfen, ob Rollläden geschlossen genug zum Hochfahren sind"
+    condition: template
+    value_template: >
+      {% set covers = expand(target_covers_var) %}
+      {% set covers_to_move = covers | selectattr('attributes.current_position', 'defined') | selectattr('attributes.current_position', 'lt', max_pos | int) | list %}
+      {{ covers_to_move | length > 0 }}
+
+action:
+  - action: cover.open_cover
+    target:
+      entity_id: !input target_covers
+
+  - choose:
+      - alias: "Check if notification is enabled"
+        conditions:
+          - condition: template
+            value_template: "{{ include_notify == 'enable_mobile_app_notify' }}"
+          - condition: template
+            value_template: "{{ filtered_devices | length > 0 }}"
+        sequence:
+          - alias: "Send a notification to each device"
+            repeat:
+              for_each: "{{ filtered_devices }}"
+              sequence:
+                - action: "notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}"
+                  data:
+                    title: !input notify_title
+                    message: >-                   
+                      Trigger: {{ trigger_label }}
+                      
+                      Wert: {{ trigger_value }}
+                      
+                      Zeit: {{ trigger_time }}
+
+                      Rollläden: {{ moving_covers_names }}
+                  continue_on_error: true
+
+  - action: input_boolean.turn_off
+    target:
+      entity_id: !input main_switch

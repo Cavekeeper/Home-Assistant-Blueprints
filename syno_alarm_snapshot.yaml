@@ -1,0 +1,141 @@
+blueprint:
+  name: SynoAI Alarm Camera Snapshot
+  description: '**Version: 1.1.0**
+
+    Erhöht Counter, macht Snapshot und triggert Alarm bei Bewegung.
+
+    '
+  domain: automation
+  source_url: https://raw.githubusercontent.com/Cavekeeper/Home-Assistant-Blueprints/main/HomeAssistant/Blueprints/syno_alarm_snapshot.yaml
+  input:
+    camera_entity:
+      name: Kamera
+      description: 'Beispiel: carport_synoai_motion'
+      selector:
+        entity:
+          domain:
+          - camera
+          reorder: false
+          multiple: false
+    motion_counter:
+      name: Counter Entity
+      description: 'Beispiel: motion_carport'
+      selector:
+        entity:
+          domain:
+          - counter
+          reorder: false
+          multiple: false
+    snapshot_path:
+      name: Speicherpfad Snapshot
+      description: 'Beispiel: /config/www/snapshots/synoai/carport_synoai_last.jpg'
+      default: /config/www/snapshots/synoai/last_motion.jpg
+    push_script:
+      name: Push Script
+      description: 'Das spezifische Push-Skript für diese Kamera.
+
+        Beispiel: push_snapshot_synoai_kamera_carport
+
+        '
+      selector:
+        entity:
+          domain:
+          - script
+          reorder: false
+          multiple: false
+    alarm_panel:
+      name: Alarm Panel
+      default: alarm_control_panel.home_alarm
+      selector:
+        entity:
+          domain:
+          - alarm_control_panel
+          reorder: false
+          multiple: false
+    start_nightmode_settings:
+      name: Alarm Night mode
+      icon: mdi:shield-moon
+      collapsed: true
+      input:
+        night_mode_active:
+          name: Nacht-Modus aktivieren?
+          description: Soll diese Kamera bei "Armed Night" die Sirene triggern?
+          default: true
+          selector:
+            boolean: {}
+        siren_action:
+          name: Sirene / Haupt-Alarmaktion
+          description: 'Aktion für den physikalischen Alarm (z.B. Sirene an).
+
+            Beispiel: rest_command.trigger_alarm_sirene
+
+            '
+          default: []
+          selector:
+            action: {}
+        night_alarm_target:
+          name: Nacht-Licht / Optischer Alarm
+          description: 'Was soll nachts zusätzlich eingeschaltet werden? (Licht, Schalter
+            oder Skript)
+
+            Beispiel: script.innenlicht_bei_alarm_intern
+
+            '
+          default: {}
+          selector:
+            target:
+              entity:
+              - domain:
+                - light
+                - switch
+                - script
+variables:
+  night_active: !input night_mode_active
+mode: single
+trigger:
+- platform: state
+  entity_id: !input camera_entity
+  from: idle
+  to: recording
+action:
+- action: counter.increment
+  target:
+    entity_id: !input motion_counter
+- action: camera.snapshot
+  data:
+    filename: !input snapshot_path
+  target:
+    entity_id: !input camera_entity
+- choose:
+  - conditions:
+    - condition: state
+      entity_id: !input alarm_panel
+      state: armed_away
+    sequence:
+    - action: alarm_control_panel.alarm_trigger
+      target:
+        entity_id: !input alarm_panel
+    - action: script.turn_on
+      target:
+        entity_id: !input push_script
+  - conditions:
+    - condition: template
+      value_template: '{{ night_active == true }}'
+    - condition: state
+      entity_id: !input alarm_panel
+      state: armed_night
+    sequence:
+    - action: alarm_control_panel.alarm_trigger
+      target:
+        entity_id: !input alarm_panel
+    - choose:
+      - conditions: '{{ siren_action != [] }}'
+        sequence: !input siren_action
+    - choose:
+      - conditions: '{{ night_alarm_target != {} }}'
+        sequence:
+        - action: homeassistant.turn_on
+          target: !input night_alarm_target
+    - action: script.turn_on
+      target:
+        entity_id: !input push_script

@@ -1,0 +1,202 @@
+blueprint:
+  name: Smart Light – Trigger
+  description: '**Version: 1.0.1**
+
+    Stabile Bewegungslicht-Automation mit Tag/Nacht-Bedingung,  Hauptschalter und
+    optionalem Sperrschalter.
+
+    '
+  domain: automation
+  source_url: https://raw.githubusercontent.com/Cavekeeper/Home-Assistant-Blueprints/main/HomeAssistant/Blueprints/smartlight_trigger.yaml
+  input:
+    trigger_entity:
+      name: Trigger (Bewegung / Klingel / etc.)
+      description: Wähle die Sensoren aus, die das Licht einschalten sollen (z.B.
+        Bewegungsmelder).
+      selector:
+        entity:
+          multiple: true
+          filter:
+          - domain:
+            - binary_sensor
+          - domain:
+            - input_boolean
+          reorder: false
+    timer_entity:
+      name: Licht-Timer
+      description: Der Timer, der die Einschaltdauer steuert. Muss vorher unter Helfer
+        erstellt werden.
+      selector:
+        entity:
+          domain:
+          - timer
+          reorder: false
+          multiple: false
+    target_lights:
+      name: Ziel-Lampen
+      description: Diese Lampen werden gesteuert.
+      selector:
+        entity:
+          multiple: true
+          domain:
+          - light
+          reorder: false
+    automation_switch:
+      name: Automatik EIN/AUS (Optional)
+      description: Ein Schalter, der die gesamte Automation deaktiviert (z.B. ein
+        'Haus-Modus'). Wenn leer, ist die Automation immer aktiv.
+      default:
+      selector:
+        entity:
+          domain:
+          - input_boolean
+          reorder: false
+          multiple: false
+    day_night_mode:
+      name: Tag/Nacht-Modus
+      description: Wann soll die Automation arbeiten?
+      default: always
+      selector:
+        select:
+          options:
+          - label: Immer aktiv
+            value: always
+          - label: Nur tagsüber
+            value: day
+          - label: Nur nachts
+            value: night
+          sort: false
+          multiple: false
+          custom_value: false
+    sun_offset:
+      name: Sonnen-Offset (Minuten)
+      description: Verschiebt den Tag-/Nacht-Wechsel (z.B. -30 für 30 Min vor Sonnenuntergang).
+      default: 0
+      selector:
+        number:
+          min: -60.0
+          max: 60.0
+          unit_of_measurement: minutes
+          step: 1.0
+          mode: slider
+    snapshot_name:
+      name: Snapshot-Name
+      description: Eindeutiger Name für die temporäre Szene (z.B. flur_licht_snap).
+        Ohne 'scene.' davor!
+      default: light_snapshot
+    start_lock_option:
+      name: Optionaler Sperr-Schalter
+      icon: mdi:toggle-switch
+      collapsed: true
+      input:
+        lock_switch:
+          name: Optionaler Sperr-Schalter?
+          description: Ein Sensor oder Schalter, der das Licht blockiert (z.B. Präsenzmelder
+            oder manueller Sperrschalter).
+          default:
+          selector:
+            entity:
+              filter:
+              - domain:
+                - binary_sensor
+              - domain:
+                - input_boolean
+              reorder: false
+              multiple: false
+        lock_mode:
+          name: Sperr-Modus
+          description: 'Straight: Sperrt, wenn Schalter AN. Invers: Sperrt, wenn Schalter
+            AUS.'
+          default: straight
+          selector:
+            select:
+              options:
+              - label: Normal (Sperrt bei AN)
+                value: straight
+              - label: Invers (Sperrt bei AUS)
+                value: invers
+              sort: false
+              multiple: false
+              custom_value: false
+mode: restart
+variables:
+  automatik_entity: !input automation_switch
+  lock_entity: !input lock_switch
+  timer: !input timer_entity
+  lights: !input target_lights
+  lock_mode: !input lock_mode
+  sun_mode: !input day_night_mode
+  sun_offset: !input sun_offset
+  snapshot_name_raw: !input snapshot_name
+trigger:
+- platform: state
+  entity_id: !input trigger_entity
+  to: 'on'
+  id: trigger
+- platform: state
+  entity_id: !input timer_entity
+  from: active
+  to: idle
+  id: timer_done
+condition:
+- condition: template
+  value_template: '{% if automatik_entity == none %} true {% else %} {{ is_state(automatik_entity,
+    ''on'') }} {% endif %}
+
+    '
+- condition: template
+  value_template: '{% if lock_entity == none %} true {% elif lock_mode == ''straight''
+    %} {{ is_state(lock_entity, ''off'') }} {% else %} {{ is_state(lock_entity, ''on'')
+    }} {% endif %}
+
+    '
+- condition: template
+  value_template: "{% if sun_mode == 'always' %} true {% else %}\n  {% set offset_sec
+    = sun_offset | int * 60 %}\n  {% set sunrise = as_timestamp(state_attr('sun.sun','next_rising'))
+    + offset_sec %}\n  {% set sunset = as_timestamp(state_attr('sun.sun','next_setting'))
+    + offset_sec %}\n  {% set now_ts = as_timestamp(now()) %}\n  {% set is_day = now_ts
+    >= sunrise or now_ts < sunset if sunrise > sunset else now_ts >= sunrise and now_ts
+    < sunset %}\n  {{ is_day if sun_mode == 'day' else not is_day }}\n{% endif %}\n"
+action:
+- choose:
+  - conditions:
+    - condition: trigger
+      id: trigger
+    sequence:
+    - variables:
+        initially_off: '{{ expand(lights) | selectattr(''state'',''eq'',''off'') |
+          map(attribute=''entity_id'') | list }}
+
+          '
+    - if:
+      - condition: template
+        value_template: '{{ not is_state(timer,''active'') and initially_off | count
+          > 0 }}'
+      then:
+      - service: scene.create
+        data:
+          scene_id: '{{ snapshot_name_raw }}'
+          snapshot_entities: '{{ initially_off }}'
+    - service: light.turn_on
+      target:
+        entity_id: '{{ initially_off }}'
+    - service: timer.start
+      target:
+        entity_id: '{{ timer }}'
+  - conditions:
+    - condition: trigger
+      id: timer_done
+    sequence:
+    - variables:
+        snapshot_scene: scene.{{ snapshot_name_raw }}
+        to_turn_off: '{{ state_attr(snapshot_scene,''entity_id'') | default([]) }}'
+    - if:
+      - condition: template
+        value_template: '{{ to_turn_off | count > 0 }}'
+      then:
+      - service: light.turn_off
+        target:
+          entity_id: '{{ to_turn_off }}'
+      - service: scene.delete
+        target:
+          entity_id: '{{ snapshot_scene }}'

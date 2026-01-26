@@ -1,0 +1,380 @@
+blueprint:
+  name: "Smart Shading: EIN"
+  description: >
+    **Version: 1.1.0**
+
+    Fährt Rollladen zur Beschattung runter, wenn alle Bedingungen erfüllt sind.
+  domain: automation
+  source_url: https://raw.githubusercontent.com/Cavekeeper/Home-Assistant-Blueprints/main/HomeAssistant/Blueprints/smart_rollershutter_shading_on.yaml
+  input:
+    target_covers:
+      name: Rollladen
+      description: >
+        Wähle die Rollladen für die Beschattung
+      default: []
+      selector:
+        entity:
+          domain:
+            - cover
+          multiple: true
+          reorder: false
+    shading_position:
+      name: Beschattungs-Position
+      description: >
+        Wähle die Rollladen-Position für die Beschattung
+      default: 16
+      selector:
+        number:
+          min: 0.0
+          max: 100.0
+          step: 1.0
+          unit_of_measurement: "%"
+          mode: slider
+    min_position_to_drive:
+          name: Mindestposition zum Starten
+          description: >
+            Nur Rollläden, die weiter offen sind als dieser Wert, werden von der Automatik bewegt (100 = ganz offen).
+          default: 50
+          selector:
+            number:
+              min: 0
+              max: 100
+              step: 1.0
+              unit_of_measurement: "%"
+              mode: slider
+    start_azimuth_setting:
+      name: Azimuth Einstellung
+      icon: mdi:sun-compass
+      collapsed: true
+      input:
+        sun_azimuth_start:
+          name: Azimuth Start
+          description: >
+            Runterfahren, wenn dieser Winkel überschritten wird (z.B. 20).
+          default: 20
+          selector:
+            number:
+              min: 0.0
+              max: 360.0
+              step: 1.0
+              unit_of_measurement: "°"
+              mode: slider
+        sun_azimuth_end:
+          name: Azimuth Ende
+          description: >
+            Runterfahren, wenn dieser Winkel unterschritten ist (z.B. 150).
+          default: 150
+          selector:
+            number:
+              min: 0.0
+              max: 360.0
+              step: 1.0
+              unit_of_measurement: "°"
+              mode: slider
+    start_elevation_setting:
+      name: Elevation Einstellung
+      icon: mdi:sun-compass
+      collapsed: true
+      input:          
+        sun_elevation_start:
+          name: Elevation Start
+          description: >
+            Sonne muss mindestens so hoch stehen (z.B. 10).
+          default: 10
+          selector:
+            number:
+              min: 0.0
+              max: 90.0
+              step: 1.0
+              unit_of_measurement: "°"
+              mode: slider
+        sun_elevation_end:
+          name: Elevation Ende
+          description: >
+            Steht die Sonne höher als dieser Wert, fährt der Rollladen nicht (z.B. 60).
+          default: 60
+          selector:
+            number:
+              min: 0.0
+              max: 90.0
+              step: 1.0
+              unit_of_measurement: "°"
+              mode: slider
+    start_sun_offset:
+      name: Sonnenstand-Zeitfenster
+      icon: mdi:weather-sunset
+      collapsed: true
+      input:
+        sunrise_offset:
+          name: Sperrzeit nach Sonnenaufgang
+          description: >
+            Verschiebt den frühestmöglichen Startzeitpunkt. 
+            Beispiel: '+01:00:00' startet erst 1 Stunde nach Sonnenaufgang. 
+            Format: HH:MM:SS (Vorzeichen + oder - zwingend erforderlich).
+          default: "+00:00:00"
+          selector:
+            text: {}
+        sunset_offset:
+          name: Sperrzeit vor Sonnenuntergang
+          description: >
+            Verschiebt den spätestmöglichen Zeitpunkt, an dem die Automatik noch aktiv ist. 
+            Beispiel: '-02:00:00' beendet die Automatik bereits 2 Stunden vor Sonnenuntergang. 
+            Format: HH:MM:SS (Vorzeichen + oder - zwingend erforderlich).
+          default: "-00:00:00"
+          selector:
+            text: {}
+    start_weather_config:
+      name: Wetter-Bedingungen
+      icon: mdi:weather-partly-cloudy
+      collapsed: true
+      input:
+        temp_sensor:
+          name: Temperatur Vorhersage Sensor
+          description: >
+            Beispiel: sensor.metno_temperatur_vorhersage_heute
+          default: []
+          selector:
+            entity:
+              domain:
+                - sensor
+              reorder: false
+              multiple: false
+        temp_threshold_input:
+          name: Temperatur Schwellwert (Helper)
+          description: >
+            Der Schwellwertsensor aus der UI
+          default: []
+          selector:
+            entity:
+              domain:
+                - input_number
+              reorder: false
+              multiple: false
+        use_custom_temp:
+          name: Temperatur-Modus
+          description: >
+            Entweder der globale Temp-Regler aus der UI oder Custom
+          default: "disable_custom_temp"
+          selector:
+            select:
+              options:
+                - label: "Aktiviere Custom Temp"
+                  value: "enable_custom_temp"
+                - label: "Deaktiviere Custom Temp"
+                  value: "disable_custom_temp"
+        custom_temp_value:
+          name: Individueller Schwellwert
+          description: >
+            Nur relevant, wenn der Schalter oben aktiviert ist.
+          default: 25
+          selector:
+            number:
+              min: 15
+              max: 35
+              unit_of_measurement: "°C"
+              step: 1.0
+              mode: slider
+        cloud_sensor:
+          name: Bewölkungs Sensor
+          description: >
+            Beispiel: sensor.metnoweather_bewolkung
+          default: []
+          selector:
+            entity:
+              domain:
+                - sensor
+              reorder: false
+              multiple: false
+        cloud_threshold_input:
+          name: Bewölkungs Schwellwert (Helper)
+          description: >
+            Der Schwellwertsensor aus der UI
+          default: []
+          selector:
+            entity:
+              domain:
+                - input_number
+              reorder: false
+              multiple: false
+        stay_down_sensor:
+          name: Bewölkungs Schwellwert (Bypass)
+          description: >
+            Oberhalb dieser Temperatur ist der Sensor Bewölkung überbrückt.
+          default: 25
+          selector:
+            number:
+              min: 15.0
+              max: 35.0
+              step: 1.0
+              unit_of_measurement: "°C"
+              mode: slider
+    start_generell_setting:
+      name: Allgemeine Einstellungen
+      icon: mdi:cog
+      collapsed: true
+      input:
+        main_switch:
+          name: Hauptschalter
+          description: >
+            Schalter auswählen, der die Automation Ein- und Ausschaltet.
+          default: []
+          selector:
+            entity:
+              domain:
+                - input_boolean
+              reorder: false
+              multiple: false
+    start_notify_option:
+      name: Nachricht senden
+      icon: mdi:devices
+      collapsed: true
+      input:
+        include_notify:
+          name: Benachrichtigung aktivieren
+          description: >
+            Soll eine Benachrichtigung gesendet werden?
+          default: disable_mobile_app_notify
+          selector:
+            select:
+              options:
+                - label: Aktiviere Mobile App Benachrichtigung
+                  value: "enable_mobile_app_notify"
+                - label: Deaktiviere Mobile App Benachrichtigung
+                  value: "disable_mobile_app_notify"
+        notify_device:
+          name: Benachrichtigungs-Dienst
+          description: >
+            Wähle hier dein Handy aus.
+          default: []
+          selector:
+            device:
+              filter:
+                - integration: mobile_app
+              multiple: true
+        notify_title:
+          name: Title
+          description: >
+            Schreibe den Titel deiner Benachrichtigung
+          default: 📢 Beschattung aktiv
+          selector: 
+            text:
+
+variables:
+  include_notify: !input include_notify
+  filtered_devices: !input notify_device
+  notify_title: !input notify_title
+  global_temp_helper: !input temp_threshold_input
+  mode: !input use_custom_temp
+  custom_val: !input custom_temp_value
+  temp_actual_sensor: !input temp_sensor
+  final_threshold: >
+    {% if mode == "enable_custom_temp" %}
+      {{ custom_val | float }}
+    {% else %}
+      {{ states(global_temp_helper) | float(0) }}
+    {% endif %}
+  target_covers_var: !input target_covers
+  min_pos: !input min_position_to_drive
+  moving_covers_names: >-
+    {% set covers = expand(target_covers_var) %}
+    {{ covers | map(attribute='name') | join(', ') }}
+  trigger_entity: "{{ trigger.entity_id }}"
+  trigger_name: "{{ state_attr(trigger.entity_id, 'friendly_name') or trigger.entity_id }}"
+  trigger_value: "{{ trigger.to_state.state }}"
+  trigger_time: "{{ now().strftime('%H:%M:%S') }}"
+  trigger_label: >
+    {% if trigger.entity_id == 'sensor.sun_azimuth' %}
+      Sonnenazimut
+    {% elif trigger.entity_id == 'sensor.sun_elevation' %}
+      Sonnenhöhe
+    {% else %}
+      {{ trigger.entity_id }}
+    {% endif %}
+
+trigger:
+  - platform: state
+    entity_id: sensor.sun_elevation
+  - platform: state
+    entity_id: sensor.sun_azimuth
+
+condition:
+  - condition: state
+    entity_id: !input main_switch
+    state: "on"
+  - condition: numeric_state
+    entity_id: sensor.sun_azimuth
+    above: !input sun_azimuth_start
+  - condition: numeric_state
+    entity_id: sensor.sun_azimuth
+    below: !input sun_azimuth_end
+  - condition: numeric_state
+    entity_id: sensor.sun_elevation
+    above: !input sun_elevation_start
+  - condition: numeric_state
+    entity_id: sensor.sun_elevation
+    below: !input sun_elevation_end
+  - condition: sun
+    after: sunrise
+    after_offset: !input sunrise_offset
+    before: sunset
+    before_offset: !input sunset_offset
+  - condition: or
+    conditions:
+      - condition: numeric_state
+        entity_id: !input cloud_sensor
+        below: !input cloud_threshold_input 
+      - condition: numeric_state
+        entity_id: sensor.metno_temperatur_vorhersage_heute
+        above: !input stay_down_sensor
+  - alias: "Prüfe Temperatur gegen (globalen oder individuellen) Schwellwert"
+    condition: template
+    value_template: >
+      {{ (states(temp_actual_sensor) | float(0)) >= (final_threshold | float) }}
+  - alias: "Sicherstellen, dass kein Rollladen gerade fährt"
+    condition: template
+    value_template: >
+      {% set covers = expand(target_covers_var) %}
+      {% set moving_covers = covers | selectattr('state', 'in', ['opening', 'closing']) | list %}
+      {{ moving_covers | length == 0 }}
+  - alias: "Prüfen, ob Rollläden weit genug offen sind"
+    condition: template
+    value_template: >
+      {% set covers = expand(target_covers_var) %}
+      {% set covers_to_move = covers | selectattr('attributes.current_position', 'defined') | selectattr('attributes.current_position', 'gt', min_pos | int) | list %}
+      {{ covers_to_move | length > 0 }}
+
+action:
+  - action: cover.set_cover_position
+    target:
+      entity_id: !input target_covers
+    data:
+      position: !input shading_position
+
+  - choose:
+      - alias: "Check if notification is enabled"
+        conditions:
+          - condition: template
+            value_template: "{{ include_notify == 'enable_mobile_app_notify' }}"
+          - condition: template
+            value_template: "{{ filtered_devices | length > 0 }}"
+        sequence:
+          - alias: "Send a notification to each device"
+            repeat:
+              for_each: "{{ filtered_devices }}"
+              sequence:
+                - action: "notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}"
+                  data:
+                    title: !input notify_title
+                    message: >-                   
+                      Trigger: {{ trigger_label }}
+                      
+                      Wert: {{ trigger_value }}
+                      
+                      Zeit: {{ trigger_time }}
+
+                      Rollläden: {{ moving_covers_names }}
+                  continue_on_error: true
+
+  - action: input_boolean.turn_off
+    target:
+      entity_id: !input main_switch
