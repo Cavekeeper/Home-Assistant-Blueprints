@@ -5,7 +5,7 @@ blueprint:
 
     Fährt Rollladen zur Beschattung runter, wenn alle Bedingungen erfüllt sind.
   domain: automation
-  source_url: https://raw.githubusercontent.com/Cavekeeper/Home-Assistant-Blueprints/main/HomeAssistant/Blueprints/Automation/smart_rollershutter_shading_on.yaml
+  source_url: https://raw.githubusercontent.com/Cavekeeper/HomeAssistant/main/Blueprints/Automation/smart_rollershutter_shading_on.yaml
   input:
     target_covers:
       name: Rollladen
@@ -324,7 +324,7 @@ condition:
         entity_id: !input cloud_sensor
         below: !input cloud_threshold_input 
       - condition: numeric_state
-        entity_id: sensor.metno_temperatur_vorhersage_heute
+        entity_id: !input temp_sensor
         above: !input stay_down_sensor
   - alias: "Prüfe Temperatur gegen (globalen oder individuellen) Schwellwert"
     condition: template

@@ -5,7 +5,7 @@ blueprint:
     
     Fährt Rollladen hoch, wenn Azimuth überschritten ODER Elevation unterschritten wird.
   domain: automation
-  source_url: https://raw.githubusercontent.com/Cavekeeper/Home-Assistant-Blueprints/main/HomeAssistant/Blueprints/Automation/smart_rollershutter_shading_off.yaml
+  source_url: https://raw.githubusercontent.com/Cavekeeper/HomeAssistant/main/Blueprints/Automation/smart_rollershutter_shading_off.yaml
   input:
     target_covers:
       name: Rollladen
@@ -80,6 +80,34 @@ blueprint:
           default: "-00:00:00"
           selector:
             text: {}
+    start_weather_config:
+      name: Wetter-Bedingungen
+      icon: mdi:weather-partly-cloudy
+      collapsed: true
+      input:
+        temp_sensor:
+          name: Temperatur Vorhersage Sensor
+          description: >
+            Beispiel: sensor.metno_temperatur_vorhersage_heute
+          default: []
+          selector:
+            entity:
+              domain:
+                - sensor
+              reorder: false
+              multiple: false
+        stay_down_sensor:
+          name: Übertemperatur (Bypass)
+          description: >
+            Oberhalb dieser Temperatur bleibt der Rollladen unten.
+          default: 25
+          selector:
+            number:
+              min: 15.0
+              max: 35.0
+              step: 1.0
+              unit_of_measurement: "°C"
+              mode: slider
     start_generell_setting:
       name: Allgemeine Einstellungen
       icon: mdi:cog
@@ -186,6 +214,9 @@ condition:
       {% set covers = expand(target_covers_var) %}
       {% set covers_to_move = covers | selectattr('attributes.current_position', 'defined') | selectattr('attributes.current_position', 'lt', max_pos | int) | list %}
       {{ covers_to_move | length > 0 }}
+  - condition: numeric_state
+    entity_id: !input temp_sensor
+    below: !input stay_down_sensor
 
 action:
   - action: cover.open_cover
