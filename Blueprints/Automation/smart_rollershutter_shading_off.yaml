@@ -57,6 +57,29 @@ blueprint:
               step: 1.0
               unit_of_measurement: "°"
               mode: slider
+    start_sun_offset:
+      name: Sonnenstand-Zeitfenster
+      icon: mdi:weather-sunset
+      collapsed: true
+      input:
+        sunrise_offset:
+          name: Sperrzeit nach Sonnenaufgang
+          description: >
+            Verschiebt den frühestmöglichen Startzeitpunkt. 
+            Beispiel: '+01:00:00' startet erst 1 Stunde nach Sonnenaufgang. 
+            Format: HH:MM:SS (Vorzeichen + oder - zwingend erforderlich).
+          default: "+00:00:00"
+          selector:
+            text: {}
+        sunset_offset:
+          name: Sperrzeit vor Sonnenuntergang
+          description: >
+            Verschiebt den spätestmöglichen Zeitpunkt, an dem die Automatik noch aktiv ist. 
+            Beispiel: '-02:00:00' beendet die Automatik bereits 2 Stunden vor Sonnenuntergang. 
+            Format: HH:MM:SS (Vorzeichen + oder - zwingend erforderlich).
+          default: "-00:00:00"
+          selector:
+            text: {}
     start_generell_setting:
       name: Allgemeine Einstellungen
       icon: mdi:cog
@@ -140,14 +163,17 @@ condition:
   - condition: state
     entity_id: !input main_switch
     state: "on"
-  - condition: or
-    conditions:
-      - condition: numeric_state
-        entity_id: sensor.sun_azimuth
-        above: !input sun_azimuth_trigger
-      - condition: numeric_state
-        entity_id: sensor.sun_elevation
-        below: !input sun_elevation_trigger
+  - condition: numeric_state
+    entity_id: sensor.sun_azimuth
+    above: !input sun_azimuth_trigger
+  - condition: numeric_state
+    entity_id: sensor.sun_elevation
+    below: !input sun_elevation_trigger
+  - condition: sun
+    after: sunrise
+    after_offset: !input sunrise_offset
+    before: sunset
+    before_offset: !input sunset_offset
   - alias: "Sicherstellen, dass kein Rollladen gerade fährt"
     condition: template
     value_template: >
