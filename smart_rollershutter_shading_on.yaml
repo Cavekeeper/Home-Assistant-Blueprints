@@ -5,7 +5,7 @@ blueprint:
 
     Fährt Rollladen zur Beschattung runter, wenn alle Bedingungen erfüllt sind.
   domain: automation
-  source_url: https://raw.githubusercontent.com/Cavekeeper/HomeAssistant/main/Blueprints/Automation/smart_rollershutter_shading_on.yaml
+  source_url: https://raw.githubusercontent.com/Cavekeeper/HomeAssistant/main/smart_rollershutter_shading_on.yaml
   input:
     target_covers:
       name: Rollladen

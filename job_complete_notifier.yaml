@@ -4,7 +4,7 @@ blueprint:
     Sendet eine Nachricht, wenn ein Gerät (z.B. Waschmaschine oder Geschirrspüler)
     laut Leistungssensor seinen Betrieb beendet hat.
   domain: automation
-  source_url: https://raw.githubusercontent.com/Cavekeeper/HomeAssistant/main/Blueprints/Automation/job_complete_notifier.yaml
+  source_url: https://raw.githubusercontent.com/Cavekeeper/HomeAssistant/main/job_complete_notifier.yaml
   input:
     power_sensor:
       name: Power Sensor

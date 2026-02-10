@@ -5,7 +5,7 @@ blueprint:
 
     Erhöht Counter, macht Snapshot und triggert Alarm bei Bewegung.
   domain: automation
-  source_url: https://raw.githubusercontent.com/Cavekeeper/HomeAssistant/main/Blueprints/Automation/syno_alarm_snapshot.yaml
+  source_url: https://raw.githubusercontent.com/Cavekeeper/HomeAssistant/main/syno_alarm_snapshot.yaml
   input:
     camera_entity:
       name: Kamera

@@ -5,7 +5,7 @@ blueprint:
     
     Fährt Rollladen hoch, wenn Azimuth überschritten ODER Elevation unterschritten wird.
   domain: automation
-  source_url: https://raw.githubusercontent.com/Cavekeeper/HomeAssistant/main/Blueprints/Automation/smart_rollershutter_shading_off.yaml
+  source_url: https://raw.githubusercontent.com/Cavekeeper/HomeAssistant/main/smart_rollershutter_shading_off.yaml
   input:
     target_covers:
       name: Rollladen

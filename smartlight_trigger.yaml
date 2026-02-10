@@ -7,7 +7,7 @@ blueprint:
 
     '
   domain: automation
-  source_url: https://raw.githubusercontent.com/Cavekeeper/HomeAssistant/main/Blueprints/Automation/smartlight_trigger.yaml
+  source_url: https://raw.githubusercontent.com/Cavekeeper/HomeAssistant/main/smartlight_trigger.yaml
   input:
     trigger_entity:
       name: Trigger (Bewegung / Klingel / etc.)
